@@ -1,0 +1,27 @@
+[workspace]
+members = [
+    "crates/core",
+    "crates/storage",
+    "crates/engine",
+    "crates/web",
+]
+resolver = "2"
+
+[workspace.dependencies]
+arrow = "55"
+parquet = { version = "55", features = ["arrow"] }
+datafusion = "46"
+deltalake = { version = "0.25", features = ["datafusion"] }
+axum = "0.8"
+tokio = { version = "1", features = ["full"] }
+tower = "0.5"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+anyhow = "1"
+criterion = { version = "0.5", features = ["html_reports"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tower-http = { version = "0.6", features = ["trace"] }
+reqwest = { version = "0.12", features = ["json"] }
+config = "0.15"

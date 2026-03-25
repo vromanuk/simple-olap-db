@@ -1,0 +1,7 @@
+[package]
+name = "olap-storage"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+olap-core = { path = "../core" }

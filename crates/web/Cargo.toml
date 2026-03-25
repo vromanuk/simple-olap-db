@@ -1,0 +1,19 @@
+[package]
+name = "olap-web"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+olap-core.path = "../core"
+olap-engine.path = "../engine"
+axum.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+tower-http.workspace = true
+serde.workspace = true
+config.workspace = true
+
+[dev-dependencies]
+reqwest.workspace = true
+tokio = { workspace = true, features = ["test-util"] }

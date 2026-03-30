@@ -3,6 +3,7 @@ use crate::configuration::Settings;
 use axum::{routing::get, Router};
 use tokio::net::TcpListener;
 use tower_http::trace::TraceLayer;
+use tracing::Span;
 
 pub struct Application {
     listener: TcpListener,
@@ -19,7 +20,26 @@ impl Application {
 
         let router = Router::new()
             .route("/health", get(api::health_check))
-            .layer(TraceLayer::new_for_http());
+            .layer(
+                TraceLayer::new_for_http()
+                    .on_request(|req: &axum::http::Request<_>, _span: &Span| {
+                        tracing::info!(method = %req.method(), uri = %req.uri(), "request");
+                    })
+                    .on_response(
+                        |res: &axum::http::Response<_>,
+                         latency: std::time::Duration,
+                         _span: &Span| {
+                            let status = res.status().as_u16();
+                            if status >= 500 {
+                                tracing::error!(status, latency_ms = ?latency, "response");
+                            } else if status >= 400 {
+                                tracing::warn!(status, latency_ms = ?latency, "response");
+                            } else {
+                                tracing::info!(status, latency_ms = ?latency, "response");
+                            }
+                        },
+                    ),
+            );
 
         Ok(Self { listener, router })
     }

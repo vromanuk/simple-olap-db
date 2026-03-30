@@ -1,3 +1,1 @@
-pub fn hello() -> &'static str {
-    "olap-core"
-}
+pub mod sample_data;

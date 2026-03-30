@@ -5,3 +5,5 @@ edition = "2021"
 
 [dependencies]
 olap-core = { path = "../core" }
+arrow.workspace = true
+parquet.workspace = true

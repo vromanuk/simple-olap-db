@@ -7,3 +7,7 @@ edition = "2021"
 olap-core = { path = "../core" }
 arrow.workspace = true
 parquet.workspace = true
+datafusion.workspace = true
+deltalake.workspace = true
+tokio.workspace = true
+serde_json.workspace = true

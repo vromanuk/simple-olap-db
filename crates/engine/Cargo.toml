@@ -6,3 +6,8 @@ edition = "2021"
 [dependencies]
 olap-core = { path = "../core" }
 olap-storage = { path = "../storage" }
+arrow.workspace = true
+parquet.workspace = true
+datafusion.workspace = true
+tokio.workspace = true
+async-trait.workspace = true

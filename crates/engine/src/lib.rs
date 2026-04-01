@@ -1,3 +1,1 @@
-pub fn hello() -> &'static str {
-    "olap-engine"
-}
+pub mod custom_table;

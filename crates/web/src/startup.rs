@@ -1,9 +1,15 @@
-use crate::api;
-use crate::configuration::Settings;
-use axum::{routing::get, Router};
+use std::sync::Arc;
+
+use axum::routing::{get, post};
+use axum::Router;
 use tokio::net::TcpListener;
 use tower_http::trace::TraceLayer;
 use tracing::Span;
+
+use olap_engine::query_engine::QueryEngine;
+
+use crate::api;
+use crate::configuration::Settings;
 
 pub struct Application {
     listener: TcpListener,
@@ -11,15 +17,19 @@ pub struct Application {
 }
 
 impl Application {
-    pub async fn build(settings: &Settings) -> std::io::Result<Self> {
+    pub async fn build(settings: &Settings, engine: QueryEngine) -> std::io::Result<Self> {
         let addr = format!(
             "{}:{}",
             settings.application.host, settings.application.port
         );
         let listener = TcpListener::bind(&addr).await?;
 
+        let shared_engine = Arc::new(engine);
+
         let router = Router::new()
             .route("/health", get(api::health_check))
+            .route("/query", post(api::query_handler))
+            .with_state(shared_engine)
             .layer(
                 TraceLayer::new_for_http()
                     .on_request(|req: &axum::http::Request<_>, _span: &Span| {

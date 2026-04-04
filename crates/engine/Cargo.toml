@@ -11,3 +11,6 @@ parquet.workspace = true
 datafusion.workspace = true
 tokio.workspace = true
 async-trait.workspace = true
+deltalake.workspace = true
+thiserror.workspace = true
+tracing.workspace = true

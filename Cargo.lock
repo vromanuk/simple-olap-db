@@ -2519,10 +2519,13 @@ dependencies = [
  "arrow",
  "async-trait",
  "datafusion",
+ "deltalake",
  "olap-core",
  "olap-storage",
  "parquet",
+ "thiserror 2.0.18",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -2542,12 +2545,14 @@ dependencies = [
 name = "olap-web"
 version = "0.1.0"
 dependencies = [
+ "arrow",
  "axum",
  "config",
  "olap-core",
  "olap-engine",
  "reqwest",
  "serde",
+ "serde_json",
  "tokio",
  "tower-http",
  "tracing",

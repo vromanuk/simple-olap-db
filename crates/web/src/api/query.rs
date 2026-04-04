@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 use olap_engine::query_engine::{EngineError, QueryEngine, QueryResult};
 use olap_engine::sql_statement::SqlStatement;
 
+use super::errors::to_http_error;
+
 #[derive(Debug, Deserialize)]
 pub struct QueryRequest {
     pub sql: String,
@@ -61,24 +63,11 @@ fn batches_to_json_rows(result: &QueryResult) -> Result<Vec<serde_json::Value>, 
             .map_err(|e| EngineError::Table(format!("failed to finalize results: {e}")))?;
     }
 
-    let rows = String::from_utf8(buf)
+    String::from_utf8(buf)
         .map_err(|e| EngineError::Table(format!("invalid UTF-8 in results: {e}")))?
         .lines()
         .filter(|line| !line.is_empty())
         .map(serde_json::from_str)
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| EngineError::Table(format!("failed to parse JSON: {e}")))?;
-
-    Ok(rows)
-}
-
-fn to_http_error(err: EngineError) -> (StatusCode, String) {
-    let status = match &err {
-        EngineError::InvalidSql(_) => StatusCode::BAD_REQUEST,
-        EngineError::Execution(_) => StatusCode::BAD_REQUEST,
-        EngineError::DeltaTable(_) => StatusCode::INTERNAL_SERVER_ERROR,
-        EngineError::Table(_) => StatusCode::INTERNAL_SERVER_ERROR,
-    };
-
-    (status, err.to_string())
+        .map_err(|e| EngineError::Table(format!("failed to parse JSON: {e}")))
 }

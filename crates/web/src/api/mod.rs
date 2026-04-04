@@ -1,5 +1,16 @@
+mod errors;
+mod explain;
 mod health;
 mod query;
+mod register;
+mod schema;
+mod stats;
+mod tables;
 
+pub use explain::explain_handler;
 pub use health::health_check;
 pub use query::query_handler;
+pub use register::register_table;
+pub use schema::table_schema;
+pub use stats::table_stats;
+pub use tables::list_tables;

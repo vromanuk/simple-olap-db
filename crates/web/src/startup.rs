@@ -29,6 +29,10 @@ impl Application {
         let router = Router::new()
             .route("/health", get(api::health_check))
             .route("/query", post(api::query_handler))
+            .route("/explain", post(api::explain_handler))
+            .route("/tables", get(api::list_tables).post(api::register_table))
+            .route("/tables/{name}/schema", get(api::table_schema))
+            .route("/tables/{name}/stats", get(api::table_stats))
             .with_state(shared_engine)
             .layer(
                 TraceLayer::new_for_http()

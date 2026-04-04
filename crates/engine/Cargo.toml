@@ -12,6 +12,7 @@ datafusion.workspace = true
 tokio.workspace = true
 async-trait.workspace = true
 deltalake.workspace = true
+duckdb.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 tracing.workspace = true

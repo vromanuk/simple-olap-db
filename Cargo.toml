@@ -8,10 +8,10 @@ members = [
 resolver = "2"
 
 [workspace.dependencies]
-arrow = { version = "54", features = ["prettyprint"] }
-parquet = { version = "54", features = ["arrow"] }
-datafusion = "46"
-deltalake = { version = "0.25", features = ["datafusion"] }
+arrow = { version = "55", features = ["prettyprint"] }
+parquet = { version = "55", features = ["arrow"] }
+datafusion = "47.0.0"
+deltalake = { version = "0.26", features = ["datafusion"] }
 axum = "0.8"
 tokio = { version = "1", features = ["full"] }
 tower = "0.5"
@@ -26,3 +26,4 @@ tower-http = { version = "0.6", features = ["trace"] }
 reqwest = { version = "0.12", features = ["json"] }
 config = "0.15"
 async-trait = "0.1"
+duckdb = { version = "=1.4.3", features = ["bundled"] }

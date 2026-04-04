@@ -1,7 +1,10 @@
+use std::sync::Arc;
+
 use arrow::array::RecordBatch;
 use arrow::datatypes::SchemaRef;
 
 use crate::datafusion_engine::DataFusionEngine;
+use crate::duckdb_engine::DuckDBEngine;
 use crate::sql_statement::SqlStatement;
 
 #[derive(Debug, thiserror::Error)]
@@ -60,51 +63,102 @@ pub enum TableFormat {
     Parquet,
 }
 
+/// Query engine enum — DataFusion methods are async-native, DuckDB methods are
+/// synchronous and run via `spawn_blocking` to avoid blocking the tokio runtime.
 pub enum QueryEngine {
     DataFusion(DataFusionEngine),
+    DuckDB(DuckDBEngine),
 }
 
 impl QueryEngine {
-    pub async fn execute(&self, query: &SqlStatement) -> EngineResult<QueryResult> {
-        match self {
+    pub async fn execute(self: &Arc<Self>, query: &SqlStatement) -> EngineResult<QueryResult> {
+        match self.as_ref() {
             QueryEngine::DataFusion(engine) => engine.execute(query.sql()).await,
+            QueryEngine::DuckDB(_) => {
+                let engine = Arc::clone(self);
+                let sql = query.sql().to_string();
+                tokio::task::spawn_blocking(move || match engine.as_ref() {
+                    QueryEngine::DuckDB(e) => e.execute(&sql),
+                    _ => unreachable!(),
+                })
+                .await
+                .map_err(|e| EngineError::Table(format!("blocking task failed: {e}")))?
+            }
         }
     }
 
-    pub async fn explain(&self, query: &SqlStatement) -> EngineResult<String> {
-        match self {
+    pub async fn explain(self: &Arc<Self>, query: &SqlStatement) -> EngineResult<String> {
+        match self.as_ref() {
             QueryEngine::DataFusion(engine) => engine.explain(query.sql()).await,
+            QueryEngine::DuckDB(_) => Ok("EXPLAIN not supported for DuckDB engine".to_string()),
         }
     }
 
     pub fn list_tables(&self) -> Vec<String> {
         match self {
             QueryEngine::DataFusion(engine) => engine.list_tables(),
+            QueryEngine::DuckDB(engine) => engine.list_tables(),
         }
     }
 
-    pub async fn table_schema(&self, name: &str) -> EngineResult<TableSchema> {
-        match self {
+    pub async fn table_schema(self: &Arc<Self>, name: &str) -> EngineResult<TableSchema> {
+        match self.as_ref() {
             QueryEngine::DataFusion(engine) => engine.table_schema(name).await,
+            QueryEngine::DuckDB(_) => {
+                let engine = Arc::clone(self);
+                let name = name.to_string();
+                tokio::task::spawn_blocking(move || match engine.as_ref() {
+                    QueryEngine::DuckDB(e) => e.table_schema(&name),
+                    _ => unreachable!(),
+                })
+                .await
+                .map_err(|e| EngineError::Table(format!("blocking task failed: {e}")))?
+            }
         }
     }
 
-    pub async fn table_stats(&self, name: &str) -> EngineResult<TableStats> {
-        match self {
+    pub async fn table_stats(self: &Arc<Self>, name: &str) -> EngineResult<TableStats> {
+        match self.as_ref() {
             QueryEngine::DataFusion(engine) => engine.table_stats(name).await,
+            QueryEngine::DuckDB(_) => {
+                let engine = Arc::clone(self);
+                let name = name.to_string();
+                tokio::task::spawn_blocking(move || match engine.as_ref() {
+                    QueryEngine::DuckDB(e) => e.table_stats(&name),
+                    _ => unreachable!(),
+                })
+                .await
+                .map_err(|e| EngineError::Table(format!("blocking task failed: {e}")))?
+            }
         }
     }
 
     pub async fn register_table(
-        &self,
+        self: &Arc<Self>,
         name: &str,
         path: &str,
         format: &TableFormat,
     ) -> EngineResult<()> {
-        match self {
+        match self.as_ref() {
             QueryEngine::DataFusion(engine) => match format {
                 TableFormat::Delta => engine.register_delta_table(name, path).await,
                 TableFormat::Parquet => engine.register_parquet_file(name, path).await,
+            },
+            QueryEngine::DuckDB(_) => match format {
+                TableFormat::Parquet => {
+                    let engine = Arc::clone(self);
+                    let name = name.to_string();
+                    let path = path.to_string();
+                    tokio::task::spawn_blocking(move || match engine.as_ref() {
+                        QueryEngine::DuckDB(e) => e.register_parquet_file(&name, &path),
+                        _ => unreachable!(),
+                    })
+                    .await
+                    .map_err(|e| EngineError::Table(format!("blocking task failed: {e}")))?
+                }
+                TableFormat::Delta => Err(EngineError::Table(
+                    "DuckDB engine does not support Delta format".to_string(),
+                )),
             },
         }
     }

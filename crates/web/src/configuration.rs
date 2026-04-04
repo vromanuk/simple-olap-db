@@ -3,12 +3,20 @@ use serde::Deserialize;
 #[derive(Deserialize, Clone)]
 pub struct Settings {
     pub application: ApplicationSettings,
+    pub engine: EngineType,
 }
 
 #[derive(Deserialize, Clone)]
 pub struct ApplicationSettings {
     pub host: String,
     pub port: u16,
+}
+
+#[derive(Deserialize, Clone, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum EngineType {
+    DataFusion,
+    DuckDB,
 }
 
 pub enum Environment {

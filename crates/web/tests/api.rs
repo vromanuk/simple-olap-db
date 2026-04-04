@@ -1,7 +1,7 @@
 use olap_core::sample_data::create_sample_batch;
 use olap_engine::datafusion_engine::DataFusionEngine;
 use olap_engine::query_engine::QueryEngine;
-use olap_web::configuration::{ApplicationSettings, Settings};
+use olap_web::configuration::{ApplicationSettings, EngineType, Settings};
 use olap_web::startup::Application;
 
 struct TestApp {
@@ -15,6 +15,7 @@ async fn spawn_app() -> TestApp {
             host: "127.0.0.1".to_string(),
             port: 0,
         },
+        engine: EngineType::DataFusion,
     };
 
     let df_engine = DataFusionEngine::new();

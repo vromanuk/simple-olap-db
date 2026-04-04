@@ -54,9 +54,28 @@ curl -s -X POST http://127.0.0.1:8080/tables -H "Content-Type: application/json"
 crates/
   core/       Arrow types, sample data, shared types
   storage/    Parquet, Delta Lake
-  engine/     DataFusion, QueryEngine enum, SQL validation
+  engine/     DataFusion, DuckDB, QueryEngine enum, SQL validation
   web/        Axum HTTP API, configuration, telemetry
 ```
+
+## Query Engines
+
+The server supports two swappable engines. Set via `configuration/base.yaml` or env var:
+
+| Engine | Description |
+|--------|-------------|
+| `datafusion` (default) | Apache DataFusion — Rust-native, Arrow-native, composable |
+| `duckdb` | DuckDB — embedded C++ OLAP database, push-based execution |
+
+```bash
+# DataFusion (default)
+cargo run --bin olap-web
+
+# DuckDB
+APP_ENGINE=duckdb cargo run --bin olap-web
+```
+
+Same API, same SQL, different engine underneath.
 
 ## Configuration
 
@@ -64,6 +83,7 @@ Settings are loaded from `configuration/base.yaml` + `configuration/local.yaml`.
 
 ```bash
 APP_APPLICATION__PORT=9090 cargo run --bin olap-web
+APP_ENGINE=duckdb cargo run --bin olap-web
 ```
 
 Debug logging (shows query execution spans):

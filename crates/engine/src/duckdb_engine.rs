@@ -273,3 +273,76 @@ fn build_arrow_columns(
 
     Ok((Arc::new(Schema::new(fields)), columns))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn setup() -> DuckDBEngine {
+        let engine = DuckDBEngine::new().unwrap();
+        engine.register_sample_data().unwrap();
+        engine
+    }
+
+    #[test]
+    fn execute_select_all() {
+        let engine = setup();
+        let result = engine.execute("SELECT * FROM events").unwrap();
+        assert_eq!(result.num_rows(), 8);
+    }
+
+    #[test]
+    fn execute_with_filter() {
+        let engine = setup();
+        let result = engine
+            .execute("SELECT * FROM events WHERE is_mobile = true")
+            .unwrap();
+        assert_eq!(result.num_rows(), 5);
+    }
+
+    #[test]
+    fn execute_aggregation() {
+        let engine = setup();
+        let result = engine
+            .execute("SELECT country, COUNT(*) as cnt FROM events GROUP BY country")
+            .unwrap();
+        assert_eq!(result.num_rows(), 3);
+    }
+
+    #[test]
+    fn execute_invalid_table() {
+        let engine = setup();
+        let err = engine.execute("SELECT * FROM nonexistent").unwrap_err();
+        assert!(err.to_string().to_lowercase().contains("nonexistent"));
+    }
+
+    #[test]
+    fn list_tables_returns_registered() {
+        let engine = setup();
+        let tables = engine.list_tables();
+        assert!(tables.contains(&"events".to_string()));
+    }
+
+    #[test]
+    fn table_schema_returns_columns() {
+        let engine = setup();
+        let schema = engine.table_schema("events").unwrap();
+        assert_eq!(schema.table_name, "events");
+        assert_eq!(schema.columns.len(), 6);
+    }
+
+    #[test]
+    fn table_schema_not_found() {
+        let engine = setup();
+        let err = engine.table_schema("nonexistent").unwrap_err();
+        assert!(err.to_string().contains("not found"));
+    }
+
+    #[test]
+    fn table_stats_returns_counts() {
+        let engine = setup();
+        let stats = engine.table_stats("events").unwrap();
+        assert_eq!(stats.num_rows, Some(8));
+        assert_eq!(stats.num_columns, 6);
+    }
+}

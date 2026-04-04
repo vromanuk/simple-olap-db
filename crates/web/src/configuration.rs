@@ -4,6 +4,14 @@ use serde::Deserialize;
 pub struct Settings {
     pub application: ApplicationSettings,
     pub engine: EngineType,
+    pub compaction: CompactionSettings,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct CompactionSettings {
+    pub enabled: bool,
+    pub interval_secs: u64,
+    pub file_count_threshold: usize,
 }
 
 #[derive(Deserialize, Clone)]

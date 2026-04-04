@@ -1,3 +1,4 @@
+pub mod compactor;
 pub mod custom_table;
 pub mod datafusion_engine;
 pub mod duckdb_engine;

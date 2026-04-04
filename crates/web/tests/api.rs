@@ -1,7 +1,7 @@
 use olap_core::sample_data::create_sample_batch;
 use olap_engine::datafusion_engine::DataFusionEngine;
 use olap_engine::query_engine::QueryEngine;
-use olap_web::configuration::{ApplicationSettings, EngineType, Settings};
+use olap_web::configuration::{ApplicationSettings, CompactionSettings, EngineType, Settings};
 use olap_web::startup::Application;
 
 struct TestApp {
@@ -16,6 +16,11 @@ async fn spawn_app() -> TestApp {
             port: 0,
         },
         engine: EngineType::DataFusion,
+        compaction: CompactionSettings {
+            enabled: false,
+            interval_secs: 3600,
+            file_count_threshold: 100,
+        },
     };
 
     let df_engine = DataFusionEngine::new();
@@ -182,4 +187,65 @@ async fn explain_returns_plan() {
     let plan = body["plan"].as_str().unwrap();
     assert!(plan.contains("Logical Plan"));
     assert!(plan.contains("Physical Plan"));
+}
+
+#[tokio::test]
+async fn query_nonexistent_table_returns_error() {
+    let app = spawn_app().await;
+    let res = app
+        .client
+        .post(format!("{}/query", app.address))
+        .json(&serde_json::json!({"sql": "SELECT * FROM nonexistent"}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), 400);
+}
+
+#[tokio::test]
+async fn query_missing_body_returns_error() {
+    let app = spawn_app().await;
+    let res = app
+        .client
+        .post(format!("{}/query", app.address))
+        .header("Content-Type", "application/json")
+        .body("{}")
+        .send()
+        .await
+        .unwrap();
+    assert!(res.status().is_client_error());
+}
+
+#[tokio::test]
+async fn register_parquet_invalid_path_returns_error() {
+    let app = spawn_app().await;
+    let res = app
+        .client
+        .post(format!("{}/tables", app.address))
+        .json(&serde_json::json!({
+            "name": "bad",
+            "path": "/nonexistent/path.parquet",
+            "format": "parquet"
+        }))
+        .send()
+        .await
+        .unwrap();
+    assert!(res.status().is_server_error() || res.status().is_client_error());
+}
+
+#[tokio::test]
+async fn register_invalid_format_returns_error() {
+    let app = spawn_app().await;
+    let res = app
+        .client
+        .post(format!("{}/tables", app.address))
+        .json(&serde_json::json!({
+            "name": "bad",
+            "path": "some.csv",
+            "format": "csv"
+        }))
+        .send()
+        .await
+        .unwrap();
+    assert!(res.status().is_client_error());
 }

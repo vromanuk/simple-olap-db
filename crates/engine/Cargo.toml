@@ -16,3 +16,5 @@ duckdb.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
+tokio-util.workspace = true
+chrono.workspace = true

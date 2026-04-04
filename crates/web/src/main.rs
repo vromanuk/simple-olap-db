@@ -1,10 +1,12 @@
 use olap_core::sample_data::create_sample_batch;
+use olap_engine::compactor::{compaction_loop, CompactionConfig};
 use olap_engine::datafusion_engine::DataFusionEngine;
 use olap_engine::duckdb_engine::DuckDBEngine;
 use olap_engine::query_engine::{EngineError, QueryEngine};
-use olap_web::configuration::{get_configuration, EngineType};
+use olap_web::configuration::{get_configuration, CompactionSettings, EngineType};
 use olap_web::startup::Application;
 use olap_web::telemetry::init_tracing;
+use tokio_util::sync::CancellationToken;
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
@@ -12,6 +14,14 @@ async fn main() -> std::io::Result<()> {
 
     let settings = get_configuration().expect("failed to read configuration");
     let engine = build_engine(&settings.engine).expect("failed to build query engine");
+
+    let cancel = CancellationToken::new();
+
+    if settings.compaction.enabled {
+        let cancel_clone = cancel.clone();
+        start_compaction_loop(&settings.compaction, cancel_clone);
+    }
+
     let app = Application::build(&settings, engine).await?;
 
     tracing::info!(
@@ -20,7 +30,10 @@ async fn main() -> std::io::Result<()> {
         app.port()
     );
 
-    app.run().await
+    app.run().await?;
+    cancel.cancel();
+
+    Ok(())
 }
 
 fn build_engine(engine_type: &EngineType) -> Result<QueryEngine, EngineError> {
@@ -40,4 +53,16 @@ fn build_engine(engine_type: &EngineType) -> Result<QueryEngine, EngineError> {
             Ok(QueryEngine::DuckDB(engine))
         }
     }
+}
+
+fn start_compaction_loop(settings: &CompactionSettings, cancel: CancellationToken) {
+    let config = CompactionConfig {
+        interval: std::time::Duration::from_secs(settings.interval_secs),
+        file_count_threshold: settings.file_count_threshold,
+    };
+
+    // TODO: populate from registered Delta table paths
+    let table_paths: Vec<String> = vec![];
+
+    tokio::spawn(compaction_loop(table_paths, config, cancel));
 }

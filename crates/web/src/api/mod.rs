@@ -1,3 +1,4 @@
+mod compact;
 mod errors;
 mod explain;
 mod health;
@@ -7,6 +8,7 @@ mod schema;
 mod stats;
 mod tables;
 
+pub use compact::{optimize_handler, vacuum_handler};
 pub use explain::explain_handler;
 pub use health::health_check;
 pub use query::query_handler;

@@ -33,6 +33,8 @@ impl Application {
             .route("/tables", get(api::list_tables).post(api::register_table))
             .route("/tables/{name}/schema", get(api::table_schema))
             .route("/tables/{name}/stats", get(api::table_stats))
+            .route("/tables/{name}/optimize", post(api::optimize_handler))
+            .route("/tables/{name}/vacuum", post(api::vacuum_handler))
             .with_state(shared_engine)
             .layer(
                 TraceLayer::new_for_http()

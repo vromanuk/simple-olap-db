@@ -255,4 +255,47 @@ mod tests {
         let batches = receiver.drain();
         assert!(batches.is_empty());
     }
+
+    #[tokio::test]
+    async fn send_rejects_batch_exceeding_max_rows() {
+        let (sender, _receiver) = create_ingest_channel(test_schema(), 100, vec![], 2);
+        let batch = test_batch(vec![1, 2, 3], vec!["a", "b", "c"]);
+        let err = sender.send(batch).await.unwrap_err();
+        assert!(err.to_string().contains("batch too large"));
+    }
+
+    #[tokio::test]
+    async fn send_accepts_batch_within_max_rows() {
+        let (sender, _receiver) = create_ingest_channel(test_schema(), 100, vec![], 2);
+        let batch = test_batch(vec![1, 2], vec!["a", "b"]);
+        sender.send(batch).await.unwrap();
+        assert_eq!(sender.pending_row_count(), 2);
+    }
+
+    #[tokio::test]
+    async fn multiple_sends_coalesce_on_drain() {
+        let (sender, mut receiver) = create_ingest_channel(test_schema(), 100, vec![], 10_000);
+        for i in 0..5 {
+            sender.send(test_batch(vec![i], vec!["x"])).await.unwrap();
+        }
+
+        let batches = receiver.drain();
+        assert_eq!(batches.len(), 5);
+
+        let schema = test_schema();
+        let coalesced = coalesce_batches(&schema, &batches).unwrap();
+        assert_eq!(coalesced.num_rows(), 5);
+    }
+
+    #[tokio::test]
+    async fn drain_clears_channel() {
+        let (sender, mut receiver) = create_ingest_channel(test_schema(), 100, vec![], 10_000);
+        sender.send(test_batch(vec![1], vec!["a"])).await.unwrap();
+
+        let first = receiver.drain();
+        assert_eq!(first.len(), 1);
+
+        let second = receiver.drain();
+        assert!(second.is_empty());
+    }
 }

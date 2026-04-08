@@ -33,8 +33,14 @@ pub async fn ingest_handler(
         return Err((StatusCode::BAD_REQUEST, "no events provided".to_string()));
     }
 
-    let json_bytes = serde_json::to_vec(&request.events)
-        .map_err(|e| (StatusCode::BAD_REQUEST, format!("invalid JSON: {e}")))?;
+    let json_lines: String = request
+        .events
+        .iter()
+        .map(serde_json::to_string)
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| (StatusCode::BAD_REQUEST, format!("invalid JSON: {e}")))?
+        .join("\n");
+    let json_bytes = json_lines.into_bytes();
 
     let reader = ReaderBuilder::new(sender.schema())
         .build(std::io::Cursor::new(json_bytes))

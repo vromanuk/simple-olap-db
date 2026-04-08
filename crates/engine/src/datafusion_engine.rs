@@ -1,4 +1,5 @@
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 use arrow::array::RecordBatch;
 use datafusion::prelude::*;
@@ -12,6 +13,7 @@ use crate::query_engine::{
 
 pub struct DataFusionEngine {
     ctx: SessionContext,
+    delta_tables: Mutex<HashMap<String, String>>,
 }
 
 impl Default for DataFusionEngine {
@@ -24,6 +26,7 @@ impl DataFusionEngine {
     pub fn new() -> Self {
         Self {
             ctx: SessionContext::new(),
+            delta_tables: Mutex::new(HashMap::new()),
         }
     }
 
@@ -34,6 +37,32 @@ impl DataFusionEngine {
     pub async fn register_delta_table(&self, name: &str, path: &str) -> EngineResult<()> {
         let table = deltalake::open_table(path).await?;
         self.ctx.register_table(name, Arc::new(table))?;
+
+        self.delta_tables
+            .lock()
+            .unwrap()
+            .insert(name.to_string(), path.to_string());
+
+        Ok(())
+    }
+
+    /// Re-registers all Delta tables to pick up new files written since last query.
+    async fn refresh_delta_tables(&self) -> EngineResult<()> {
+        let tables: Vec<(String, String)> = self
+            .delta_tables
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+
+        for (name, path) in tables {
+            let table = deltalake::open_table(&path).await?;
+            self.ctx
+                .deregister_table(&name)
+                .map_err(|e| EngineError::Table(e.to_string()))?;
+            self.ctx.register_table(&name, Arc::new(table))?;
+        }
 
         Ok(())
     }
@@ -54,6 +83,7 @@ impl DataFusionEngine {
 
     #[tracing::instrument(skip(self), fields(rows))]
     pub async fn execute(&self, sql: &str) -> EngineResult<QueryResult> {
+        self.refresh_delta_tables().await?;
         let df = self.ctx.sql(sql).await?;
         let schema = df.schema().inner().clone();
         let batches = df.collect().await?;

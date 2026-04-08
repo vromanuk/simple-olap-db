@@ -1,5 +1,8 @@
-use olap_core::sample_data::create_sample_batch;
+use std::sync::Arc;
+
+use olap_core::sample_data::{create_sample_batch, web_analytics_schema};
 use olap_engine::datafusion_engine::DataFusionEngine;
+use olap_engine::ingest::create_ingest_channel;
 use olap_engine::query_engine::QueryEngine;
 use olap_web::configuration::{
     ApplicationSettings, CompactionSettings, EngineType, IngestSettings, Settings,
@@ -9,6 +12,7 @@ use olap_web::startup::Application;
 struct TestApp {
     address: String,
     client: reqwest::Client,
+    _ingest_receiver: Option<olap_engine::ingest::IngestReceiver>,
 }
 
 async fn spawn_app() -> TestApp {
@@ -43,6 +47,7 @@ async fn spawn_app() -> TestApp {
     TestApp {
         address: format!("http://127.0.0.1:{port}"),
         client: reqwest::Client::new(),
+        _ingest_receiver: None,
     }
 }
 
@@ -255,4 +260,118 @@ async fn register_invalid_format_returns_error() {
         .await
         .unwrap();
     assert!(res.status().is_client_error());
+}
+
+async fn spawn_app_with_ingest() -> TestApp {
+    let settings = Settings {
+        application: ApplicationSettings {
+            host: "127.0.0.1".to_string(),
+            port: 0,
+        },
+        engine: EngineType::DataFusion,
+        compaction: CompactionSettings {
+            enabled: false,
+            interval_secs: 3600,
+            file_count_threshold: 100,
+        },
+        ingest: IngestSettings {
+            max_batch_rows: 100,
+            channel_capacity: 1000,
+            flush_interval_secs: 30,
+        },
+    };
+
+    let df_engine = DataFusionEngine::new();
+    df_engine
+        .register_batch("events", create_sample_batch())
+        .unwrap();
+    let engine = QueryEngine::DataFusion(df_engine);
+
+    let schema = Arc::new(web_analytics_schema());
+    let (sender, receiver) = create_ingest_channel(schema, 1000, vec![], 100);
+
+    let app = Application::build(&settings, engine, Some(sender))
+        .await
+        .unwrap();
+    let port = app.port();
+    tokio::spawn(app.run());
+
+    TestApp {
+        address: format!("http://127.0.0.1:{port}"),
+        client: reqwest::Client::new(),
+        _ingest_receiver: Some(receiver),
+    }
+}
+
+#[tokio::test]
+async fn ingest_accepts_valid_events() {
+    let app = spawn_app_with_ingest().await;
+    let res = app
+        .client
+        .post(format!("{}/ingest", app.address))
+        .json(&serde_json::json!({
+            "events": [
+                {"event_id": 100, "page_url": "/test", "user_id": 5000, "country": "FR",
+                 "duration_ms": 300, "timestamp_us": 1705400000000000_i64, "is_mobile": true}
+            ]
+        }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), 200);
+
+    let body: serde_json::Value = res.json().await.unwrap();
+    assert_eq!(body["rows_accepted"], 1);
+}
+
+#[tokio::test]
+async fn ingest_accepts_multiple_events() {
+    let app = spawn_app_with_ingest().await;
+    let res = app
+        .client
+        .post(format!("{}/ingest", app.address))
+        .json(&serde_json::json!({
+            "events": [
+                {"event_id": 100, "page_url": "/a", "user_id": 1, "country": "US",
+                 "duration_ms": 100, "timestamp_us": 1705400000000000_i64, "is_mobile": true},
+                {"event_id": 101, "page_url": "/b", "user_id": 2, "country": "DE",
+                 "duration_ms": 200, "timestamp_us": 1705400001000000_i64, "is_mobile": false}
+            ]
+        }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), 200);
+
+    let body: serde_json::Value = res.json().await.unwrap();
+    assert_eq!(body["rows_accepted"], 2);
+    assert!(body["pending_total"].as_u64().unwrap() >= 2);
+}
+
+#[tokio::test]
+async fn ingest_rejects_empty_events() {
+    let app = spawn_app_with_ingest().await;
+    let res = app
+        .client
+        .post(format!("{}/ingest", app.address))
+        .json(&serde_json::json!({"events": []}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), 400);
+}
+
+#[tokio::test]
+async fn ingest_not_available_without_buffer() {
+    let app = spawn_app().await;
+    let res = app
+        .client
+        .post(format!("{}/ingest", app.address))
+        .json(&serde_json::json!({
+            "events": [{"event_id": 1, "page_url": "/x", "country": "US"}]
+        }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), 404);
 }

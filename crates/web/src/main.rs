@@ -113,6 +113,7 @@ async fn init_delta_table() -> Result<(), EngineError> {
         .map_err(EngineError::DeltaTable)?
         .write(vec![batch])
         .with_save_mode(deltalake::protocol::SaveMode::ErrorIfExists)
+        .with_partition_columns(vec!["country"])
         .await
         .map_err(EngineError::DeltaTable)?;
 

@@ -2987,6 +2987,7 @@ dependencies = [
  "arrow 55.2.0",
  "axum",
  "config",
+ "deltalake",
  "olap-core",
  "olap-engine",
  "reqwest",

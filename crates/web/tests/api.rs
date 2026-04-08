@@ -1,7 +1,9 @@
 use olap_core::sample_data::create_sample_batch;
 use olap_engine::datafusion_engine::DataFusionEngine;
 use olap_engine::query_engine::QueryEngine;
-use olap_web::configuration::{ApplicationSettings, CompactionSettings, EngineType, Settings};
+use olap_web::configuration::{
+    ApplicationSettings, CompactionSettings, EngineType, IngestSettings, Settings,
+};
 use olap_web::startup::Application;
 
 struct TestApp {
@@ -21,6 +23,11 @@ async fn spawn_app() -> TestApp {
             interval_secs: 3600,
             file_count_threshold: 100,
         },
+        ingest: IngestSettings {
+            max_batch_rows: 10_000,
+            channel_capacity: 10_000,
+            flush_interval_secs: 30,
+        },
     };
 
     let df_engine = DataFusionEngine::new();
@@ -29,7 +36,7 @@ async fn spawn_app() -> TestApp {
         .unwrap();
     let engine = QueryEngine::DataFusion(df_engine);
 
-    let app = Application::build(&settings, engine).await.unwrap();
+    let app = Application::build(&settings, engine, None).await.unwrap();
     let port = app.port();
     tokio::spawn(app.run());
 

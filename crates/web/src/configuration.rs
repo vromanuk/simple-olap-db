@@ -5,6 +5,14 @@ pub struct Settings {
     pub application: ApplicationSettings,
     pub engine: EngineType,
     pub compaction: CompactionSettings,
+    pub ingest: IngestSettings,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct IngestSettings {
+    pub max_batch_rows: usize,
+    pub channel_capacity: usize,
+    pub flush_interval_secs: u64,
 }
 
 #[derive(Deserialize, Clone)]

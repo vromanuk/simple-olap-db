@@ -6,3 +6,7 @@ compaction:
   enabled: false
   interval_secs: 3600
   file_count_threshold: 100
+ingest:
+  max_batch_rows: 10000
+  channel_capacity: 10000
+  flush_interval_secs: 30
